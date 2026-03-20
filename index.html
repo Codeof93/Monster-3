@@ -587,12 +587,12 @@ function showEnd(elapsed){
   var nightStr=cfg.night==='friday'?'Friday':'Saturday';
   var isFri=cfg.night==='friday';
   var openLine=isFri?'TGIF is all finished.':'SNICK is long over by now.';
-  var closeLine=isFri?'your mom\'s light came on in the window.':'someone\'s dad called everyone in.';
+  var closeLine=isFri?'someone\'s mom called everyone in.':'someone\'s dad called everyone in.';
   var lines=[
     nightStr+' night.','',openLine,'',
     'you were out for '+m+' minutes.','',
     caughtCountTotal>0?'the monster got you '+caughtCountTotal+(caughtCountTotal===1?' time.':' times.'):'the monster never caught you.',
-    '','eventually the lights came on inside.',closeLine,'','time to go in.'
+    '','time to go home.',closeLine,'','time to go in.'
   ];
   document.getElementById('end-text').innerHTML=lines.map(function(l){return l||'&nbsp;';}).join('<br>');
 }
