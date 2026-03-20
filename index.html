@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monster</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; color: #fff; font-family: 'Courier New', monospace; overflow: hidden; height: 100vh; width: 100vw; }
+#screen-title, #screen-setup, #screen-intro, #screen-game, #screen-caught, #screen-end { display: none; position: absolute; inset: 0; }
+#screen-title.active, #screen-setup.active, #screen-intro.active, #screen-game.active, #screen-caught.active, #screen-end.active { display: flex; }
+#screen-title { background: #000; align-items: center; justify-content: center; flex-direction: column; gap: 40px; }
+.title-word { font-size: clamp(4rem, 15vw, 10rem); font-weight: bold; letter-spacing: 0.08em; animation: titlePulse 4s ease-in-out infinite; text-shadow: 0 0 40px currentColor; cursor: default; user-select: none; }
+@keyframes titlePulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; text-shadow: 0 0 60px currentColor, 0 0 100px currentColor; } }
+.title-prompt { font-size: 0.8rem; color: #333; letter-spacing: 0.3em; text-transform: uppercase; animation: blink 2s step-end infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+#screen-setup { background: #000; align-items: center; justify-content: center; flex-direction: column; gap: 32px; }
+.setup-q { font-size: 0.75rem; color: #555; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 6px; }
+.setup-opts { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.opt-btn { background: #000; border: 1px solid #222; color: #444; font-family: 'Courier New', monospace; font-size: 1rem; padding: 10px 24px; cursor: pointer; letter-spacing: 0.1em; transition: all 0.2s; }
+.opt-btn:hover { border-color: #555; color: #888; }
+.opt-btn.selected { border-color: #888; color: #ddd; }
+.start-btn { background: #000; border: 1px solid #333; color: #444; font-family: 'Courier New', monospace; font-size: 0.85rem; padding: 10px 32px; cursor: pointer; letter-spacing: 0.3em; text-transform: uppercase; transition: all 0.2s; margin-top: 8px; }
+.start-btn:hover:not(:disabled) { border-color: #666; color: #aaa; }
+.start-btn:disabled { opacity: 0.2; cursor: default; }
+#screen-intro { background: #000; align-items: center; justify-content: center; flex-direction: column; padding: 40px; }
+.intro-text { max-width: 520px; text-align: center; line-height: 2; color: #444; font-size: 0.85rem; letter-spacing: 0.05em; }
+.intro-line { opacity: 0; transition: opacity 1.2s; margin-bottom: 4px; }
+.intro-line.visible { opacity: 1; }
+#screen-game { background: #000; flex-direction: column; }
+#game-canvas { position: absolute; top: 0; left: 0; image-rendering: pixelated; }
+#hud { position: absolute; top: 12px; left: 0; right: 0; display: flex; justify-content: space-between; align-items: flex-start; padding: 0 16px; pointer-events: none; z-index: 10; }
+.hud-left { font-size: 0.6rem; color: #222; letter-spacing: 0.2em; line-height: 1.8; }
+.hud-right { font-size: 0.6rem; color: #222; letter-spacing: 0.2em; text-align: right; line-height: 1.8; }
+.hud-timer { font-size: 0.7rem; color: #333; }
+#narrative-box { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); max-width: 400px; width: 90%; text-align: center; font-size: 0.68rem; color: #2a2a2a; letter-spacing: 0.08em; line-height: 1.7; pointer-events: none; z-index: 10; transition: color 0.8s, opacity 0.8s; }
+#narrative-box.lit { color: #555; }
+#screen-caught { background: rgba(0,0,0,0.95); align-items: center; justify-content: center; flex-direction: column; gap: 20px; z-index: 100; }
+.caught-word { font-size: clamp(2rem, 8vw, 5rem); color: #cc0000; font-weight: bold; letter-spacing: 0.1em; animation: titlePulse 1s ease-in-out infinite; }
+.caught-sub { font-size: 0.75rem; color: #333; letter-spacing: 0.3em; }
+.caught-btn { background: #000; border: 1px solid #333; color: #444; font-family: 'Courier New', monospace; font-size: 0.75rem; padding: 8px 24px; cursor: pointer; letter-spacing: 0.2em; margin-top: 10px; transition: all 0.2s; }
+.caught-btn:hover { border-color: #666; color: #888; }
+#screen-end { background: #000; align-items: center; justify-content: center; flex-direction: column; gap: 24px; }
+.end-text { font-size: 0.7rem; color: #333; letter-spacing: 0.2em; text-align: center; line-height: 2; max-width: 400px; }
+</style>
+</head>
+<body>
+
+<div id="screen-title" class="active">
+  <div class="title-word" id="title-color" style="color:#1a7a1a">Monster</div>
+  <div class="title-prompt">press any key</div>
+</div>
+
+<div id="screen-setup">
+  <div>
+    <div class="setup-q">night</div>
+    <div class="setup-opts">
+      <button class="opt-btn" data-group="night" data-val="friday" onclick="pick(this)">Friday</button>
+      <button class="opt-btn" data-group="night" data-val="saturday" onclick="pick(this)">Saturday</button>
+    </div>
+  </div>
+  <div>
+    <div class="setup-q">kids out tonight</div>
+    <div class="setup-opts">
+      <button class="opt-btn" data-group="kids" data-val="3" onclick="pick(this)">3</button>
+      <button class="opt-btn" data-group="kids" data-val="5" onclick="pick(this)">5</button>
+      <button class="opt-btn" data-group="kids" data-val="10" onclick="pick(this)">10</button>
+    </div>
+  </div>
+  <div>
+    <div class="setup-q">how long</div>
+    <div class="setup-opts">
+      <button class="opt-btn" data-group="time" data-val="10" onclick="pick(this)">10 min</button>
+      <button class="opt-btn" data-group="time" data-val="15" onclick="pick(this)">15 min</button>
+      <button class="opt-btn" data-group="time" data-val="30" onclick="pick(this)">30 min</button>
+    </div>
+  </div>
+  <button class="start-btn" id="go-btn" disabled onclick="startIntro()">go outside</button>
+</div>
+
+<div id="screen-intro">
+  <div class="intro-text" id="intro-text"></div>
+</div>
+
+<div id="screen-game">
+  <canvas id="game-canvas"></canvas>
+  <div id="hud">
+    <div class="hud-left" id="hud-left"></div>
+    <div class="hud-right" id="hud-right">
+      <div class="hud-timer" id="hud-timer"></div>
+    </div>
+  </div>
+  <div id="narrative-box"></div>
+</div>
+
+<div id="screen-caught">
+  <div class="caught-word">GOT YOU.</div>
+  <div class="caught-sub" id="caught-sub">the monster found you</div>
+  <button class="caught-btn" onclick="resumeGame()">keep running</button>
+  <button class="caught-btn" onclick="endGame()">go inside</button>
+</div>
+
+<div id="screen-end">
+  <div class="end-text" id="end-text"></div>
+  <button class="start-btn" onclick="resetGame()">play again</button>
+</div>
+
+<script>
+var cfg = { night: null, kids: 0, time: 0 };
+var setupDone = { night: false, kids: false, time: false };
+var titleColors = ['#1a7a1a','#cc0000','#1a7a1a','#cc0000','#1a7a1a'];
+var tcIdx = 0;
+setInterval(function(){
+  if(Math.random() < 0.12){
+    tcIdx = (tcIdx+1)%titleColors.length;
+    var el = document.getElementById('title-color');
+    if(el) el.style.color = titleColors[tcIdx];
+  }
+}, 800);
+document.addEventListener('keydown', function(e){
+  if(document.getElementById('screen-title').classList.contains('active')) show('screen-setup');
+});
+document.getElementById('screen-title').addEventListener('click', function(){ show('screen-setup'); });
+
+function pick(btn){
+  var group = btn.dataset.group;
+  document.querySelectorAll('[data-group="'+group+'"]').forEach(function(b){ b.classList.remove('selected'); });
+  btn.classList.add('selected');
+  cfg[group] = btn.dataset.val;
+  setupDone[group] = true;
+  if(setupDone.night && setupDone.kids && setupDone.time){
+    document.getElementById('go-btn').disabled = false;
+    cfg.kids = parseInt(cfg.kids);
+    cfg.time = parseInt(cfg.time);
+  }
+}
+
+function startIntro(){
+  show('screen-intro');
+  var isFriday = cfg.night === 'friday';
+  var lines = isFriday ? [
+    'Friday night.',
+    'TGIF just ended.',
+    'The last show was almost over when you called.',
+    'You called ' + (cfg.kids <= 3 ? 'a couple friends' : 'everyone you could think of') + '.',
+    (cfg.kids <= 3 ? 'Three of you' : cfg.kids <= 5 ? 'Five of you' : 'All of you') + ' end up outside.',
+    "Someone's dad agreed to be the monster.",
+    'He goes around the block first.',
+    'You have a head start.',
+    'It is dark.',
+    '',
+    'Stay away from the porch lights.',
+    'He can see you there.',
+    '',
+    'Run.',
+  ] : [
+    'Saturday night.',
+    'SNICK is almost over.',
+    'Are You Afraid of the Dark just finished.',
+    'You called ' + (cfg.kids <= 3 ? 'a couple friends' : 'everyone you could think of') + '.',
+    (cfg.kids <= 3 ? 'Three of you' : cfg.kids <= 5 ? 'Five of you' : 'All of you') + ' end up outside.',
+    "Someone's dad agreed to be the monster.",
+    'He goes around the block first.',
+    'You have a head start.',
+    'It is dark.',
+    '',
+    'Stay away from the porch lights.',
+    'He can see you there.',
+    '',
+    'Run.',
+  ];
+  var container = document.getElementById('intro-text');
+  container.innerHTML = '';
+  lines.forEach(function(line){
+    var d = document.createElement('div');
+    d.className = 'intro-line';
+    d.textContent = line || '\u00a0';
+    container.appendChild(d);
+  });
+  var els = container.querySelectorAll('.intro-line');
+  var delay = 0;
+  els.forEach(function(el, i){
+    setTimeout(function(){ el.classList.add('visible'); }, delay);
+    delay += (i < 8) ? 900 : 600;
+  });
+  setTimeout(function(){ initGame(); }, delay + 1200);
+}
+
+var canvas, ctx, W, H, TILE=20, COLS, ROWS;
+var gameState={}, gameLoop=null, gameStartTime=0, paused=false;
+var mapData=null, houses=[], porchLights=[], trees=[], fences=[];
+var player, kids, monster;
+var caughtCount=0, caughtCountTotal=0;
+var narrativeText='', narrativeTimer=0, lastNarrative=0, narrativeQueue=[];
+var frameCount=0, camX=0, camY=0, keys={};
+
+function initGame(){
+  show('screen-game');
+  canvas = document.getElementById('game-canvas');
+  ctx = canvas.getContext('2d');
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+  buildMap();
+  spawnEntities();
+  setupInput();
+  gameStartTime = Date.now();
+  paused = false;
+  narrativeQueue = [];
+  lastNarrative = 0;
+  caughtCount = 0;
+  caughtCountTotal = 0;
+  gameLoop = setInterval(tick, 50);
+}
+
+function resizeCanvas(){
+  W=window.innerWidth; H=window.innerHeight;
+  canvas.width=W; canvas.height=H;
+  COLS=Math.floor(W/TILE)+2; ROWS=Math.floor(H/TILE)+2;
+}
+
+function buildMap(){
+  houses=[]; porchLights=[]; trees=[]; fences=[];
+  var bw=1600, bh=1200;
+  gameState.worldW=bw; gameState.worldH=bh;
+  for(var i=0;i<4;i++){
+    var hx=60, hy=120+i*250;
+    houses.push({x:hx,y:hy,w:140,h:140,shade:rand(0x1a,0x28)});
+    porchLights.push({x:hx+140,y:hy+60,r:90+Math.random()*40});
+    if(Math.random()<0.5) fences.push({x:hx,y:hy+140,w:140,h:8});
+  }
+  for(var i=0;i<4;i++){
+    var hx=bw-200, hy=120+i*250;
+    houses.push({x:hx,y:hy,w:140,h:140,shade:rand(0x18,0x26)});
+    porchLights.push({x:hx-10,y:hy+60,r:85+Math.random()*40});
+    if(Math.random()<0.5) fences.push({x:hx,y:hy+140,w:140,h:8});
+  }
+  for(var i=0;i<4;i++){
+    var hx=200+i*340, hy=60;
+    houses.push({x:hx,y:hy,w:160,h:130,shade:rand(0x1c,0x2a)});
+    porchLights.push({x:hx+70,y:hy+130,r:80+Math.random()*40});
+  }
+  for(var i=0;i<4;i++){
+    var hx=200+i*340, hy=bh-200;
+    houses.push({x:hx,y:hy,w:160,h:130,shade:rand(0x1a,0x28)});
+    porchLights.push({x:hx+70,y:hy-10,r:85+Math.random()*40});
+  }
+  for(var i=0;i<18;i++){
+    trees.push({x:80+Math.random()*(bw-160),y:80+Math.random()*(bh-160),r:12+Math.random()*16});
+  }
+}
+
+function rand(lo,hi){ return lo+Math.floor(Math.random()*(hi-lo)); }
+
+function spawnEntities(){
+  player={x:gameState.worldW/2,y:gameState.worldH/2,vx:0,vy:0,speed:2.8,r:7,hasFlashlight:true,flashAngle:0,caught:false,name:'you'};
+  kids=[];
+  var names=['Tyler','Mike','Sarah','Chris','Jamie','Devon','Keisha','Pat','Alex','Jordan'];
+  for(var i=0;i<cfg.kids-1;i++){
+    var angle=(Math.PI*2/cfg.kids)*i;
+    kids.push({x:player.x+Math.cos(angle)*80,y:player.y+Math.sin(angle)*80,vx:0,vy:0,speed:2.4+Math.random()*0.6,r:6,name:names[i],scared:false,scaredTimer:0,hideTimer:0,caught:false,wanderAngle:Math.random()*Math.PI*2,wanderTimer:Math.floor(Math.random()*60)});
+  }
+  monster={x:320,y:260,speed:1.0,r:18,patrolTimer:20,pauseTimer:0,roarTimer:180+Math.floor(Math.random()*120),lurchTimer:0,mode:'patrol',targetX:500,targetY:500,visible:false,roarDisplay:0};
+}
+
+function setupInput(){
+  window.onkeydown=function(e){keys[e.key]=true;};
+  window.onkeyup=function(e){keys[e.key]=false;};
+}
+
+function updateCamera(){
+  var tx=Math.max(0,Math.min(gameState.worldW-W,player.x-W/2));
+  var ty=Math.max(0,Math.min(gameState.worldH-H,player.y-H/2));
+  camX+=(tx-camX)*0.12; camY+=(ty-camY)*0.12;
+}
+
+function showNarrative(txt,duration){
+  narrativeText=txt; narrativeTimer=duration||220;
+  var nb=document.getElementById('narrative-box');
+  nb.textContent=txt; nb.classList.toggle('lit',txt.length>0);
+}
+
+function collidesHouse(x,y,r){
+  for(var i=0;i<houses.length;i++){var h=houses[i];if(x+r>h.x&&x-r<h.x+h.w&&y+r>h.y&&y-r<h.y+h.h)return true;}
+  return false;
+}
+function clampWorld(e){
+  e.x=Math.max(e.r+10,Math.min(gameState.worldW-e.r-10,e.x));
+  e.y=Math.max(e.r+10,Math.min(gameState.worldH-e.r-10,e.y));
+}
+
+function tick(){
+  if(paused)return;
+  frameCount++;
+  var elapsed=(Date.now()-gameStartTime)/1000;
+  var limit=cfg.time*60;
+  if(elapsed>=limit){clearInterval(gameLoop);showEnd(elapsed);return;}
+  movePlayer(); moveKids(); moveMonster(elapsed);
+  updateCamera(); checkCaught(); updateNarrative(elapsed);
+  render(); updateHUD(elapsed,limit);
+}
+
+function movePlayer(){
+  var dx=0,dy=0;
+  if(keys['ArrowLeft']||keys['a']||keys['A'])dx-=1;
+  if(keys['ArrowRight']||keys['d']||keys['D'])dx+=1;
+  if(keys['ArrowUp']||keys['w']||keys['W'])dy-=1;
+  if(keys['ArrowDown']||keys['s']||keys['S'])dy+=1;
+  if(dx&&dy){dx*=0.707;dy*=0.707;}
+  var nx=player.x+dx*player.speed,ny=player.y+dy*player.speed;
+  if(!collidesHouse(nx,player.y,player.r))player.x=nx;
+  if(!collidesHouse(player.x,ny,player.r))player.y=ny;
+  clampWorld(player);
+  if(dx||dy)player.flashAngle=Math.atan2(dy,dx);
+}
+  function moveKids(){
+  for(var i=0;i<kids.length;i++){
+    var k=kids[i];
+    if(k.caught)continue;
+    var dmx=monster.x-k.x,dmy=monster.y-k.y,distM=Math.sqrt(dmx*dmx+dmy*dmy);
+    var dpx=player.x-k.x,dpy=player.y-k.y,distP=Math.sqrt(dpx*dpx+dpy*dpy);
+    var dx=0,dy=0;
+    if(distM<340){
+      k.scared=true; k.scaredTimer=120;
+      var offsetA=(i-(kids.length-1)/2)*0.35;
+      var bunchDist=28+i*14;
+      var bunchAngle=player.flashAngle+Math.PI+offsetA;
+      var bx=player.x+Math.cos(bunchAngle)*bunchDist;
+      var by=player.y+Math.sin(bunchAngle)*bunchDist;
+      var btx=bx-k.x,bty=by-k.y,btd=Math.sqrt(btx*btx+bty*bty);
+      if(btd>4){dx=btx/btd;dy=bty/btd;}
+    } else if(k.scaredTimer>0){
+      k.scaredTimer--;
+      if(distP>10){dx=dpx/distP;dy=dpy/distP;}
+    } else {
+      k.wanderTimer--;
+      if(k.wanderTimer<=0){
+        k.wanderAngle=player.flashAngle+Math.PI+(Math.random()-0.5)*1.8;
+        k.wanderTimer=80+Math.floor(Math.random()*100);
+      }
+      var followDist=50+i*18+Math.sin(frameCount*0.02+i)*20;
+      var targetX=player.x+Math.cos(k.wanderAngle)*followDist;
+      var targetY=player.y+Math.sin(k.wanderAngle)*followDist;
+      var ftx=targetX-k.x,fty=targetY-k.y,ftd=Math.sqrt(ftx*ftx+fty*fty);
+      if(distP>200){
+        var px2=distP>10?dpx/distP:0,py2=distP>10?dpy/distP:0;
+        dx=px2*0.8+(ftd>6?ftx/ftd*0.2:0);
+        dy=py2*0.8+(ftd>6?fty/ftd*0.2:0);
+      } else {
+        if(ftd>6){dx=ftx/ftd;dy=fty/ftd;}
+      }
+    }
+    var spd=k.scared?k.speed*1.6:k.speed*0.8;
+    var nx=k.x+dx*spd,ny=k.y+dy*spd;
+    if(!collidesHouse(nx,k.y,k.r))k.x=nx;
+    if(!collidesHouse(k.x,ny,k.r))k.y=ny;
+    clampWorld(k);
+  }
+}
+
+function moveMonster(elapsed){
+  var m=monster;
+  m.roarTimer--;
+  if(m.lurchTimer>0)m.lurchTimer--;
+  if(m.pauseTimer>0){m.pauseTimer--;return;}
+  var pdist=dist(m.x,m.y,player.x,player.y);
+  if(pdist<300){
+    if(m.mode!=='hunt'){m.mode='hunt';m.lurchTimer=0;}
+  } else if(pdist>500&&m.mode==='hunt'){
+    m.mode='patrol';
+    m.patrolTimer=80+Math.floor(Math.random()*100);
+    m.pauseTimer=20+Math.floor(Math.random()*25);
+  }
+  if(m.mode==='patrol'){
+    m.patrolTimer--;
+    if(m.patrolTimer<=0){
+      var drift=200;
+      m.targetX=Math.max(100,Math.min(gameState.worldW-100,player.x+(Math.random()-0.5)*drift*2));
+      m.targetY=Math.max(100,Math.min(gameState.worldH-100,player.y+(Math.random()-0.5)*drift*2));
+      m.patrolTimer=80+Math.floor(Math.random()*100);
+      if(Math.random()<0.25){m.lurchTimer=20+Math.floor(Math.random()*20);m.pauseTimer=15+Math.floor(Math.random()*18);}
+    }
+  }
+  var tx=m.mode==='hunt'?player.x:m.targetX;
+  var ty=m.mode==='hunt'?player.y:m.targetY;
+  var dx=tx-m.x,dy=ty-m.y,d=Math.sqrt(dx*dx+dy*dy);
+  if(d>6){
+    var baseSpd=m.mode==='hunt'?1.7:1.1;
+    if(m.lurchTimer>0)baseSpd*=1.3;
+    m.x+=dx/d*baseSpd; m.y+=dy/d*baseSpd;
+    if(collidesHouse(m.x,m.y,m.r)){
+      m.x-=dx/d*baseSpd; m.y-=dy/d*baseSpd;
+      if(!collidesHouse(m.x+dx/d*baseSpd,m.y,m.r)){
+        m.x+=dx/d*baseSpd;
+      } else if(!collidesHouse(m.x,m.y+dy/d*baseSpd,m.r)){
+        m.y+=dy/d*baseSpd;
+      } else {
+        var ccx=gameState.worldW/2,ccy=gameState.worldH/2;
+        var ccd=dist(m.x,m.y,ccx,ccy);
+        if(ccd>1){m.x+=(ccx-m.x)/ccd*4;m.y+=(ccy-m.y)/ccd*4;}
+        m.targetX=player.x+150*(Math.random()-0.5);
+        m.targetY=player.y+150*(Math.random()-0.5);
+        m.patrolTimer=0;
+      }
+    }
+  } else if(m.mode==='patrol'){
+    m.pauseTimer=30+Math.floor(Math.random()*50);
+    m.patrolTimer=0;
+  }
+  clampWorld(m);
+  if(m.roarTimer<=0){
+    if(pdist<180){
+      var grunts=['HNNGH','UGH','GRRRH','huh','HHNG','gruh','HEH','NNGH','HRRGH','ugh','GHH'];
+      m.roarTimer=80+Math.floor(Math.random()*100);
+      showNarrative(grunts[Math.floor(Math.random()*grunts.length)],60);
+    } else if(pdist<450){
+      var near=['somewhere close','...','...','slow footsteps','something breathing','footsteps stop','...','right around the corner','don\'t move'];
+      m.roarTimer=160+Math.floor(Math.random()*180);
+      showNarrative(near[Math.floor(Math.random()*near.length)],130);
+    } else if(pdist<750){
+      var far=['','','','','','somewhere out there','','','','','you hear something','','',''];
+      m.roarTimer=220+Math.floor(Math.random()*250);
+      var t=far[Math.floor(Math.random()*far.length)];
+      if(t)showNarrative(t,160);
+    } else {
+      m.roarTimer=300+Math.floor(Math.random()*200);
+    }
+  }
+  m.visible=false;
+  if(pdist<130)m.visible=true;
+  if(m.mode==='hunt'&&pdist<320)m.visible=true;
+  porchLights.forEach(function(pl){if(dist(m.x,m.y,pl.x,pl.y)<pl.r*0.8)m.visible=true;});
+}
+
+function checkCaught(){
+  if((Date.now()-gameStartTime)<4000)return;
+  var m=monster;
+  var all=[player].concat(kids);
+  all.forEach(function(e){
+    if(e.caught)return;
+    if(dist(m.x,m.y,e.x,e.y)<m.r+e.r+4){
+      e.caught=true;
+      if(e===player){
+        paused=true; caughtCountTotal++;
+        document.getElementById('caught-sub').textContent=caughtCountTotal===1?'the monster found you':'got you again';
+        show('screen-caught');
+      } else {
+        setTimeout(function(){if(!paused)showNarrative(e.name+' got caught',160);},100);
+        setTimeout(function(){e.caught=false;e.x=player.x+rand(-120,120);e.y=player.y+rand(-120,120);},8000);
+      }
+    }
+  });
+}
+
+function updateNarrative(elapsed){
+  if(narrativeTimer>0){narrativeTimer--;if(narrativeTimer===0)showNarrative('');}
+  if(elapsed>30&&Math.random()<0.0008&&narrativeTimer===0){
+    var fridayAmb=[
+      '','','','','','it is very dark','','','','','','the street is quiet',
+      '','','','','','somewhere a dog barks','','','','',
+      'you can still hear the TV inside','','','','','',
+      "someone's porch light just came on",'','','','','',
+    ];
+    var saturdayAmb=[
+      '','','','','','it is very dark','','','','','','the street is quiet',
+      '','','','','','somewhere a dog barks','','','','',
+      'SNICK is probably over by now','','','','',
+      'you can hear the TV from inside','','','','',
+      'the air smells like fall','','','','','',
+    ];
+    var ambient=cfg.night==='friday'?fridayAmb:saturdayAmb;
+    var t=ambient[Math.floor(Math.random()*ambient.length)];
+    if(t)showNarrative(t,180);
+  }
+}
+
+function dist(ax,ay,bx,by){var dx=ax-bx,dy=ay-by;return Math.sqrt(dx*dx+dy*dy);}
+  function render(){
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  ctx.save(); ctx.translate(-camX,-camY);
+  ctx.fillStyle='#070707'; ctx.fillRect(0,0,gameState.worldW,gameState.worldH);
+  ctx.strokeStyle='#0f0f0f'; ctx.lineWidth=1;
+  ctx.strokeRect(50,50,gameState.worldW-100,gameState.worldH-100);
+  ctx.strokeRect(30,30,gameState.worldW-60,gameState.worldH-60);
+  ctx.fillStyle='#060808'; ctx.fillRect(60,60,gameState.worldW-120,gameState.worldH-120);
+  porchLights.forEach(function(pl){
+    var grad=ctx.createRadialGradient(pl.x,pl.y,0,pl.x,pl.y,pl.r);
+    grad.addColorStop(0,'rgba(200,180,80,0.18)');
+    grad.addColorStop(0.4,'rgba(160,140,50,0.08)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(pl.x,pl.y,pl.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(220,200,100,0.5)'; ctx.beginPath(); ctx.arc(pl.x,pl.y,4,0,Math.PI*2); ctx.fill();
+  });
+  houses.forEach(function(h){
+    var s=h.shade;
+    ctx.fillStyle='rgb('+s+','+s+','+s+')'; ctx.fillRect(h.x,h.y,h.w,h.h);
+    if(Math.random()<0.004){ctx.fillStyle='rgba(200,180,100,0.06)';ctx.fillRect(h.x+20,h.y+20,30,20);}
+    ctx.fillStyle='rgb('+(s-6)+','+(s-6)+','+(s-6)+')'; ctx.fillRect(h.x+h.w/2-8,h.y+h.h-30,16,30);
+  });
+  fences.forEach(function(f){ctx.fillStyle='#131313';ctx.fillRect(f.x,f.y,f.w,f.h);});
+  trees.forEach(function(t){
+    ctx.fillStyle='#060a06'; ctx.beginPath(); ctx.arc(t.x,t.y,t.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#0a0f0a'; ctx.lineWidth=1; ctx.stroke();
+  });
+  if(player.hasFlashlight&&!player.caught){
+    var fa=player.flashAngle,fl=130,fw=0.45;
+    var grad=ctx.createRadialGradient(player.x,player.y,2,player.x,player.y,fl);
+    grad.addColorStop(0,'rgba(220,220,200,0.13)');
+    grad.addColorStop(0.6,'rgba(180,180,160,0.05)');
+    grad.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.save(); ctx.fillStyle=grad; ctx.beginPath();
+    ctx.moveTo(player.x,player.y); ctx.arc(player.x,player.y,fl,fa-fw,fa+fw);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  kids.forEach(function(k){
+    if(k.caught)return;
+    var pd=dist(k.x,k.y,player.x,player.y),inLight=false;
+    porchLights.forEach(function(pl){if(dist(k.x,k.y,pl.x,pl.y)<pl.r)inLight=true;});
+    var inFlash=isInFlashlight(k.x,k.y),visible=inFlash||inLight||(pd<45);
+    if(!visible)return;
+    ctx.globalAlpha=inLight?0.7:inFlash?0.55:0.35;
+    ctx.fillStyle='#8a8a8a'; ctx.beginPath(); ctx.arc(k.x,k.y,k.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#bbb'; ctx.beginPath(); ctx.arc(k.x-1,k.y-2,2,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  });
+  if(!player.caught){
+    var inPorch=false;
+    porchLights.forEach(function(pl){if(dist(player.x,player.y,pl.x,pl.y)<pl.r)inPorch=true;});
+    ctx.fillStyle=inPorch?'#aaa':'#999';
+    ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(230,230,200,0.8)';
+    ctx.beginPath(); ctx.arc(player.x+Math.cos(player.flashAngle)*9,player.y+Math.sin(player.flashAngle)*9,2.5,0,Math.PI*2); ctx.fill();
+  }
+  if(monster.visible){
+    ctx.globalAlpha=0.5+Math.sin(frameCount*0.08)*0.1;
+    ctx.fillStyle='#2a2a2a'; ctx.beginPath(); ctx.arc(monster.x,monster.y,monster.r,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#444'; ctx.lineWidth=1.5; ctx.stroke(); ctx.globalAlpha=1;
+  } else if(dist(monster.x,monster.y,player.x,player.y)<120){
+    ctx.globalAlpha=0.06*(1-(dist(monster.x,monster.y,player.x,player.y)/120));
+    ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(monster.x,monster.y,monster.r,0,Math.PI*2); ctx.fill();
+    ctx.globalAlpha=1;
+  }
+  ctx.restore();
+  var vig=ctx.createRadialGradient(W/2,H/2,H*0.2,W/2,H/2,H*0.9);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.92)');
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+}
+
+function isInFlashlight(wx,wy){
+  var dx=wx-player.x,dy=wy-player.y,d=Math.sqrt(dx*dx+dy*dy);
+  if(d>140)return false;
+  var diff=Math.atan2(dy,dx)-player.flashAngle;
+  while(diff>Math.PI)diff-=Math.PI*2;
+  while(diff<-Math.PI)diff+=Math.PI*2;
+  return Math.abs(diff)<0.5;
+}
+
+function updateHUD(elapsed,limit){
+  var remaining=Math.max(0,limit-elapsed);
+  var m=Math.floor(remaining/60),s=Math.floor(remaining%60);
+  document.getElementById('hud-left').textContent=cfg.night==='friday'?'friday':'saturday';
+  document.getElementById('hud-right').innerHTML='<div class="hud-timer">'+m+':'+(s<10?'0':'')+s+'</div>';
+}
+
+function show(id){
+  var ids=['screen-title','screen-setup','screen-intro','screen-game','screen-caught','screen-end'];
+  ids.forEach(function(s){document.getElementById(s).classList.remove('active');});
+  document.getElementById(id).classList.add('active');
+}
+
+function resumeGame(){
+  player.caught=false;
+  var angle=Math.random()*Math.PI*2;
+  player.x=monster.x+Math.cos(angle)*200;
+  player.y=monster.y+Math.sin(angle)*200;
+  clampWorld(player); paused=false; show('screen-game'); showNarrative('',0);
+}
+
+function endGame(){
+  clearInterval(gameLoop);
+  showEnd((Date.now()-gameStartTime)/1000);
+}
+
+function showEnd(elapsed){
+  show('screen-end');
+  var m=Math.floor(elapsed/60);
+  var nightStr=cfg.night==='friday'?'Friday':'Saturday';
+  var isFri=cfg.night==='friday';
+  var openLine=isFri?'TGIF is all finished.':'SNICK is long over by now.';
+  var closeLine=isFri?'your mom\'s light came on in the window.':'someone\'s dad called everyone in.';
+  var lines=[
+    nightStr+' night.','',openLine,'',
+    'you were out for '+m+' minutes.','',
+    caughtCountTotal>0?'the monster got you '+caughtCountTotal+(caughtCountTotal===1?' time.':' times.'):'the monster never caught you.',
+    '','eventually the lights came on inside.',closeLine,'','time to go in.'
+  ];
+  document.getElementById('end-text').innerHTML=lines.map(function(l){return l||'&nbsp;';}).join('<br>');
+}
+
+function resetGame(){
+  clearInterval(gameLoop);
+  cfg={night:null,kids:0,time:0};
+  setupDone={night:false,kids:false,time:false};
+  document.querySelectorAll('.opt-btn').forEach(function(b){b.classList.remove('selected');});
+  document.getElementById('go-btn').disabled=true;
+  show('screen-setup');
+}
+
+var touchStart={x:0,y:0};
+function setupTouch(){
+  var c=document.getElementById('game-canvas');
+  c.addEventListener('touchstart',function(e){
+    touchStart={x:e.touches[0].clientX,y:e.touches[0].clientY};
+  },true);
+  c.addEventListener('touchmove',function(e){
+    e.preventDefault();
+    var dx=e.touches[0].clientX-touchStart.x,dy=e.touches[0].clientY-touchStart.y;
+    var len=Math.sqrt(dx*dx+dy*dy);
+    if(len>8){
+      keys['ArrowRight']=dx>0;keys['ArrowLeft']=dx<0;
+      keys['ArrowDown']=dy>0;keys['ArrowUp']=dy<0;
+      player.flashAngle=Math.atan2(dy,dx);
+    }
+  },{passive:false});
+  c.addEventListener('touchend',function(){
+    keys['ArrowRight']=keys['ArrowLeft']=keys['ArrowDown']=keys['ArrowUp']=false;
+  },true);
+}
+
+var _initGame=initGame;
+initGame=function(){_initGame();setupTouch();};
+</script>
+</body>
+</html>
