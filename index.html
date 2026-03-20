@@ -592,7 +592,7 @@ function showEnd(elapsed){
     nightStr+' night.','',openLine,'',
     'you were out for '+m+' minutes.','',
     caughtCountTotal>0?'the monster got you '+caughtCountTotal+(caughtCountTotal===1?' time.':' times.'):'the monster never caught you.',
-    '','time to go home.',closeLine,''until next time'
+    '','time to go home.',closeLine,','until next time'
   ];
   document.getElementById('end-text').innerHTML=lines.map(function(l){return l||'&nbsp;';}).join('<br>');
 }
